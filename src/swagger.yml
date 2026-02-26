@@ -1,0 +1,590 @@
+openapi: 3.0.0
+info:
+  title: LSTM Stock Price Prediction API
+  description: |
+    API RESTful para previsão de preços de ações usando LSTM Neural Networks.
+    
+    **Recursos principais:**
+    - Predições de preços (single-step e multi-step)
+    - Acesso a dados históricos de 100+ tickers NASDAQ
+    - Monitoramento em tempo real da API
+    - Análises técnicas e métricas
+    - Sistema de logs e auditoria
+    
+    **Autenticação:** Não requerida (pode ser adicionada em produção)
+    
+    **Rate Limiting:** Sem limite (pode ser adicionado em produção)
+  version: "1.0.0"
+  contact:
+    name: Tech Challenge
+    url: https://github.com/techchallenge
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:5001
+    description: Servidor Local
+  - url: http://localhost:5001/api/v1
+    description: API Base URL
+
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Verifica o status de saúde da aplicação
+      operationId: healthCheck
+      tags:
+        - Sistema
+      responses:
+        '200':
+          description: API funcionando normalmente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  version:
+                    type: string
+                  model_loaded:
+                    type: boolean
+                  uptime_seconds:
+                    type: number
+                  timestamp:
+                    type: string
+                    format: date-time
+              example:
+                status: "healthy"
+                version: "1.0.0"
+                model_loaded: true
+                uptime_seconds: 3600.5
+                timestamp: "2026-02-26T16:10:00"
+        '503':
+          description: Serviço indisponível
+
+  /api/v1/predict:
+    post:
+      summary: Predição Single-Step
+      description: |
+        Realiza uma predição do preço da ação para o próximo dia.
+        
+        Você pode fornecer os dados de duas formas:
+        1. Array de preços históricos
+        2. Ticker e número de dias (busca os dados automaticamente)
+      operationId: predictSingle
+      tags:
+        - Predições
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PredictionRequestPrices'
+                - $ref: '#/components/schemas/PredictionRequestTicker'
+            examples:
+              com_precos:
+                value:
+                  prices: [263.5, 264.0, 265.2, 264.8, 266.1]
+                  ticker: "AAPL"
+              com_ticker:
+                value:
+                  ticker: "AAPL"
+                  days: 60
+      responses:
+        '200':
+          description: Predição realizada com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionResponse'
+        '400':
+          description: Requisição inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Modelo não carregado
+
+  /api/v1/predict-multi:
+    post:
+      summary: Predição Multi-Step
+      description: |
+        Realiza previsões para múltiplos dias futuros (até 30 dias).
+      operationId: predictMultiple
+      tags:
+        - Predições
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - oneOf:
+                    - $ref: '#/components/schemas/PredictionRequestPrices'
+                    - $ref: '#/components/schemas/PredictionRequestTicker'
+                - type: object
+                  properties:
+                    forecast_days:
+                      type: integer
+                      minimum: 1
+                      maximum: 30
+                      default: 15
+                      description: Número de dias para prever
+            example:
+              ticker: "AAPL"
+              days: 60
+              forecast_days: 15
+      responses:
+        '200':
+          description: Predições realizadas com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultiPredictionResponse'
+        '400':
+          description: Requisição inválida
+        '503':
+          description: Modelo não carregado
+
+  /api/v1/tickers:
+    get:
+      summary: Lista de Tickers Disponíveis
+      description: Retorna todos os tickers disponíveis na base de dados
+      operationId: listTickers
+      tags:
+        - Dados
+      responses:
+        '200':
+          description: Lista de tickers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tickers:
+                    type: array
+                    items:
+                      type: string
+                    example: ["AAPL", "MSFT", "GOOGL", "AMZN"]
+                  count:
+                    type: integer
+              example:
+                success: true
+                tickers: ["AAPL", "MSFT", "GOOGL", "AMZN"]
+                count: 100
+        '503':
+          description: Dados não carregados
+
+  /api/v1/ticker/{ticker}:
+    get:
+      summary: Informações do Ticker
+      description: Retorna informações detalhadas sobre um ticker específico
+      operationId: getTickerInfo
+      tags:
+        - Dados
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Símbolo do ticker (ex: AAPL, MSFT)"
+          example: AAPL
+      responses:
+        '200':
+          description: Informações do ticker
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TickerInfoResponse'
+        '404':
+          description: Ticker não encontrado
+        '503':
+          description: Dados não carregados
+
+  /api/v1/analytics/{ticker}:
+    get:
+      summary: Análise Técnica
+      description: Retorna análise técnica detalhada de um ticker
+      operationId: getAnalytics
+      tags:
+        - Análise
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AAPL
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 90
+            minimum: 1
+            maximum: 365
+          description: "Período em dias"
+      responses:
+        '200':
+          description: Dados de análise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+        '404':
+          description: Ticker não encontrado
+        '503':
+          description: Dados não carregados
+
+  /api/v1/monitoring/report:
+    get:
+      summary: Relatório de Monitoramento
+      description: Retorna métricas de monitoramento e performance da API
+      operationId: getMonitoringReport
+      tags:
+        - Monitoramento
+      responses:
+        '200':
+          description: Relatório de monitoramento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitoringReportResponse'
+        '503':
+          description: Monitoramento indisponível
+
+  /api/v1/logs:
+    get:
+      summary: Logs do Sistema
+      description: Retorna logs do sistema com opção de filtro por tipo
+      operationId: getLogs
+      tags:
+        - Sistema
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+          description: Número máximo de logs
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [prediction, inference, drift, error, warning, info]
+          description: Filtrar por tipo de log
+      responses:
+        '200':
+          description: Logs do sistema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogsResponse'
+        '503':
+          description: Logs indisponíveis
+
+  /api/v1/info:
+    get:
+      summary: Informações da API
+      description: Retorna informações gerais sobre a API e endpoints disponíveis
+      operationId: getApiInfo
+      tags:
+        - Sistema
+      responses:
+        '200':
+          description: Informações da API
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiInfoResponse'
+
+components:
+  schemas:
+    PredictionRequestPrices:
+      type: object
+      required:
+        - prices
+      properties:
+        prices:
+          type: array
+          items:
+            type: number
+          minimum: 10
+          description: Array de preços históricos (mínimo 10)
+          example: [263.5, 264.0, 265.2, 264.8, 266.1]
+        ticker:
+          type: string
+          description: Símbolo do ticker (opcional)
+          example: "AAPL"
+
+    PredictionRequestTicker:
+      type: object
+      required:
+        - ticker
+        - days
+      properties:
+        ticker:
+          type: string
+          description: Símbolo do ticker
+          example: "AAPL"
+        days:
+          type: integer
+          minimum: 10
+          maximum: 1000
+          description: Número de dias históricos
+          example: 60
+
+    Prediction:
+      type: object
+      properties:
+        ticker:
+          type: string
+          description: Símbolo do ticker
+        current_price:
+          type: number
+          description: Preço atual
+        predicted_price:
+          type: number
+          description: Preço predito
+        change:
+          type: number
+          description: Mudança absoluta
+        change_pct:
+          type: number
+          description: Mudança em percentual
+        confidence:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+          description: Nível de confiança
+        volatility:
+          type: number
+          description: Volatilidade
+        trend:
+          type: string
+          enum: ["🔺 UP", "🔻 DOWN", "➡️ STABLE"]
+          description: Tendência
+
+    PredictionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        prediction:
+          $ref: '#/components/schemas/Prediction'
+        metadata:
+          type: object
+          properties:
+            model:
+              type: string
+            sequence_length:
+              type: integer
+            timestamp:
+              type: string
+              format: date-time
+        monitoring:
+          type: object
+          properties:
+            latency_ms:
+              type: number
+
+    MultiPredictionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        predictions:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: integer
+              predicted_price:
+                type: number
+              change:
+                type: number
+              change_pct:
+                type: number
+        summary:
+          type: object
+          properties:
+            total_days:
+              type: integer
+            initial_price:
+              type: number
+            final_price:
+              type: number
+            total_change:
+              type: number
+            total_change_pct:
+              type: number
+            trend:
+              type: string
+        metadata:
+          type: object
+
+    TickerInfoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        ticker:
+          type: string
+        records_count:
+          type: integer
+        data_range:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date
+            to:
+              type: string
+              format: date
+        latest_price:
+          type: number
+        price_range:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+            mean:
+              type: number
+
+    AnalyticsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        analytics:
+          type: object
+          properties:
+            ticker:
+              type: string
+            period:
+              type: integer
+            dates:
+              type: array
+              items:
+                type: string
+                format: date
+            prices:
+              type: array
+              items:
+                type: number
+            volumes:
+              type: array
+              items:
+                type: number
+            volatility:
+              type: array
+              items:
+                type: number
+            returns:
+              type: array
+              items:
+                type: number
+
+    MonitoringReportResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        report:
+          type: object
+          properties:
+            api:
+              type: object
+              properties:
+                uptime_seconds:
+                  type: number
+                requests_total:
+                  type: integer
+                errors_total:
+                  type: integer
+                error_rate:
+                  type: number
+            inference:
+              type: object
+            resources:
+              type: object
+            health:
+              type: object
+
+    LogsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        logs:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              type:
+                type: string
+              message:
+                type: string
+        metrics:
+          type: array
+          items: {}
+        count:
+          type: integer
+
+    ApiInfoResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        info:
+          type: object
+          properties:
+            name:
+              type: string
+            version:
+              type: string
+            description:
+              type: string
+            model:
+              type: object
+            endpoints:
+              type: array
+              items:
+                type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Invalid request"
+
+tags:
+  - name: Sistema
+    description: Endpoints de sistema e saúde da API
+  - name: Predições
+    description: Endpoints para realizar predições de preços
+  - name: Dados
+    description: Endpoints para acessar dados históricos
+  - name: Análise
+    description: Endpoints para análise técnica
+  - name: Monitoramento
+    description: Endpoints para monitoramento da API
