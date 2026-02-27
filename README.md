@@ -334,7 +334,6 @@ Cliente (resultado + metadata)
 ## 🐳 Execução com Podman
 
 > **Nota:** A partir da v2.0, a aplicação é **completamente efêmera** e não requer volumes persistentes!  
-> Consulte [EPHEMERAL_GUIDE.md](./EPHEMERAL_GUIDE.md) para mais detalhes.
 
 ### Pré-requisitos
 
@@ -363,46 +362,20 @@ podman build -t lstm-prediction:latest -f Containerfile .
 
 **Tempo estimado:** 5-10 minutos (primeira vez)
 
-### 2. Executar Container (SEM Volumes)
+### 2. Executar Container 
 
 #### ✨ Forma Simples (Recomendado)
 
 ```bash
 # Sem nenhum volume - tudo automaticamente efêmero
-podman run --replace \
+podman run -d \
   --name lstm-prediction \
   -p 8080:8080 \
   -p 5001:5001 \
   -p 5000:5000 \
-  --restart unless-stopped \
   lstm-prediction:latest
 ```
 
-#### Com Docker Compose
-
-```bash
-# Build & Run
-docker-compose up -d
-
-# Parar
-docker-compose down
-```
-
-#### Com Volumes (Opcional - Para Persistência)
-
-Se você precisar de logs persistentes:
-
-```bash
-podman run --replace \
-  --name lstm-prediction \
-  -p 8080:8080 \
-  -p 5001:5001 \
-  -p 5000:5000 \
-  -v $(pwd)/logs:/tmp/lstm-logs:z \
-  -v $(pwd)/monitoring_logs:/tmp/lstm-monitoring-logs:z \
-  --restart unless-stopped \
-  lstm-prediction:latest
-```
 
 ### 3. Verificar Status
 
