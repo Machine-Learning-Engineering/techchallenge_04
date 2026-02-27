@@ -44,15 +44,18 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src/ ./src/
 COPY README.md .
 
-# Criar diretórios necessários
+# Criar diretórios necessários com permissões apropriadas
 RUN mkdir -p /app/src/logs \
+    /app/src/monitoring_logs \
+    /app/src/data && \
+    chmod 777 /app/src/logs \
     /app/src/monitoring_logs \
     /app/src/data
 
 # Garantir que o script de inicialização seja executável
 RUN chmod +x /app/src/START_ALL.sh /app/src/run_all.sh
 
-# Mudar propriedade para appuser
+# Mudar propriedade para appuser (appuser pode escrever em subdirs)
 RUN chown -R appuser:appuser /app
 
 # Trocar para usuário não-root

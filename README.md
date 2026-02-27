@@ -367,13 +367,14 @@ podman build -t lstm-prediction:latest -f Containerfile .
 
 ```bash
 # Executar em modo daemon
-podman run -d \
+podman run \
+  --replace \
   --name lstm-prediction \
   -p 8080:8080 \
   -p 5001:5001 \
   -p 5000:5000 \
-  -v $(pwd)/src/logs:/app/src/logs \
-  -v $(pwd)/src/monitoring_logs:/app/src/monitoring_logs \
+  -v $(pwd)/src/logs:/app/src/logs:z \
+  -v $(pwd)/src/monitoring_logs:/app/src/monitoring_logs:z \
   --restart unless-stopped \
   lstm-prediction:latest
 ```

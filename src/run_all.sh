@@ -143,14 +143,19 @@ start_service() {
     local script=$3
     local log_file="$PROJECT_DIR/logs/${name}.log"
     
-    # Criar diretório de logs se não existir
+    # Criar diretório de logs se não existir e com permissões apropriadas
     mkdir -p "$PROJECT_DIR/logs"
+    chmod 777 "$PROJECT_DIR/logs" 2>/dev/null || true
+    
+    # Pré-criar o arquivo de log com permissões apropriadas
+    touch "$log_file" 2>/dev/null || true
+    chmod 666 "$log_file" 2>/dev/null || true
     
     log_info "Iniciando $name (porta $port)..."
     
     # Iniciar serviço
     cd "$PROJECT_DIR"
-    nohup python3 "$script" > "$log_file" 2>&1 &
+    nohup python3 "$script" >> "$log_file" 2>&1 &
     local pid=$!
     
     # Salvar PID

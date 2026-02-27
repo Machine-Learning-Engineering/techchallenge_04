@@ -26,16 +26,19 @@ class MonitoringLogger:
     
     def __init__(self, log_dir: str = "monitoring_logs"):
         self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(exist_ok=True)
+        self.log_dir.mkdir(exist_ok=True, mode=0o777)
         
         # Logger para eventos estruturados (JSON)
         self.events_log = self.log_dir / "events.jsonl"
+        self._ensure_file_writable(self.events_log)
         
         # Logger para métricas de performance
         self.metrics_log = self.log_dir / "metrics.jsonl"
+        self._ensure_file_writable(self.metrics_log)
         
         # Logger para alertas
         self.alerts_log = self.log_dir / "alerts.jsonl"
+        self._ensure_file_writable(self.alerts_log)
         
         # Setup logging padrão
         logging.basicConfig(
@@ -47,6 +50,18 @@ class MonitoringLogger:
             ]
         )
         self.logger = logging.getLogger("ModelMonitoring")
+    
+    def _ensure_file_writable(self, file_path: Path):
+        """Garante que o arquivo existe e é gravável"""
+        try:
+            if file_path.exists():
+                # Mudar permissões para writable
+                os.chmod(str(file_path), 0o666)
+            else:
+                # Criar arquivo
+                file_path.touch(mode=0o666)
+        except Exception as e:
+            logging.getLogger("ModelMonitoring").warning(f"Erro ao preparar arquivo {file_path}: {e}")
     
     def log_event(self, event_type: str, data: Dict):
         """Registra evento estruturado em JSON"""
