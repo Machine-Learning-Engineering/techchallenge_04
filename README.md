@@ -331,6 +331,451 @@ Cliente (resultado + metadata)
 
 ---
 
+## 🐳 Execução com Podman
+
+> **Nota:** A partir da v2.0, a aplicação é **completamente efêmera** e não requer volumes persistentes!  
+> Consulte [EPHEMERAL_GUIDE.md](./EPHEMERAL_GUIDE.md) para mais detalhes.
+
+### Pré-requisitos
+
+- **Podman** ou **Docker** instalado
+- Portas **8080**, **5001** e **5000** disponíveis
+- Mínimo **2GB RAM** disponível
+
+### 1. Build da Imagem
+
+```bash
+# Clone o repositório
+git clone https://github.com/Machine-Learning-Engineering/techchallenge_04.git
+cd techchallenge_04
+
+# Build da imagem
+podman build -t lstm-prediction:latest -f Containerfile .
+```
+
+**O build inclui:**
+- ✅ Python 3.11-slim
+- ✅ TensorFlow 2.13+
+- ✅ Flask e dependências
+- ✅ Modelo LSTM pré-treinado
+- ✅ **Dados históricos NASDAQ-100 inclusos**
+- ✅ Scripts de inicialização
+
+**Tempo estimado:** 5-10 minutos (primeira vez)
+
+### 2. Executar Container (SEM Volumes)
+
+#### ✨ Forma Simples (Recomendado)
+
+```bash
+# Sem nenhum volume - tudo automaticamente efêmero
+podman run --replace \
+  --name lstm-prediction \
+  -p 8080:8080 \
+  -p 5001:5001 \
+  -p 5000:5000 \
+  --restart unless-stopped \
+  lstm-prediction:latest
+```
+
+#### Com Docker Compose
+
+```bash
+# Build & Run
+docker-compose up -d
+
+# Parar
+docker-compose down
+```
+
+#### Com Volumes (Opcional - Para Persistência)
+
+Se você precisar de logs persistentes:
+
+```bash
+podman run --replace \
+  --name lstm-prediction \
+  -p 8080:8080 \
+  -p 5001:5001 \
+  -p 5000:5000 \
+  -v $(pwd)/logs:/tmp/lstm-logs:z \
+  -v $(pwd)/monitoring_logs:/tmp/lstm-monitoring-logs:z \
+  --restart unless-stopped \
+  lstm-prediction:latest
+```
+
+### 3. Verificar Status
+
+```bash
+# Ver containers rodando
+podman ps
+
+# Ver logs em tempo real
+podman logs -f lstm-prediction
+
+# Verificar health check
+podman inspect lstm-prediction | grep -A 5 Health
+
+# Acessar shell do container
+podman exec -it lstm-prediction bash
+```
+
+**Validação de Serviços:**
+
+```bash
+# Health check da API
+curl http://localhost:5001/health
+
+# Listar tickers disponíveis
+curl http://localhost:5001/api/v1/tickers
+
+# Verificar web interface
+curl -I http://localhost:8080
+```
+
+**Parar e Remover:**
+
+```bash
+# Parar container
+podman stop lstm-prediction
+
+# Remover container
+podman rm lstm-prediction
+```
+
+# 🚀 LSTM Stock Price Prediction
+
+> Sistema completo de previsão de preços de ações usando redes neurais LSTM, com API RESTful, interface web interativa e dashboard de monitoramento em tempo real.
+
+[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13+-orange.svg)](https://www.tensorflow.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.3+-green.svg)](https://flask.palletsprojects.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+---
+
+## 📋 Sumário
+
+- [Visão Geral](#-visão-geral)
+- [Características](#-características)
+- [Arquitetura](#-arquitetura)
+- [Estrutura do Projeto](#-estrutura-do-projeto)
+  - [Árvore Completa](#árvore-completa)
+  - [Descrição dos Componentes](#descrição-dos-componentes)
+- [Execução com Podman](#-execução-com-podman)
+  - [Build da Imagem](#1-build-da-imagem)
+  - [Executar Container](#2-executar-container)
+  - [Verificar Status](#3-verificar-status)
+- [APIs](#-apis)
+  - [Endpoints Disponíveis](#endpoints-disponíveis)
+  - [Exemplos de Uso](#exemplos-de-uso)
+  - [Documentação Swagger](#documentação-swagger)
+- [Monitoramento](#-monitoramento)
+  - [Dashboard](#dashboard)
+  - [Métricas Coletadas](#métricas-coletadas)
+  - [Health Check](#health-check)
+- [Logs](#-logs)
+  - [Tipos de Logs](#tipos-de-logs)
+  - [Localização](#localização)
+  - [Acesso via API](#acesso-via-api)
+- [Desenvolvimento Local](#-desenvolvimento-local)
+- [Troubleshooting](#-troubleshooting)
+
+---
+
+## 🎯 Visão Geral
+
+O **LSTM Stock Price Prediction** é um sistema de machine learning para previsão de preços de ações utilizando redes neurais LSTM (Long Short-Term Memory). O projeto oferece:
+
+- **API RESTful** completa para predições single-step e multi-step
+- **Interface Web** intuitiva para testes interativos
+- **Dashboard de Monitoramento** com métricas em tempo real
+- **Documentação Swagger** interativa para todas as APIs
+- **Sistema de Logs** estruturado (eventos e métricas)
+- **Containerização** completa com Podman/Docker
+
+O modelo foi treinado com dados históricos do NASDAQ-100 e é capaz de:
+- Prever preços futuros de ações
+- Calcular tendências (alta, baixa, estável)
+- Estimar níveis de confiança
+- Analisar volatilidade
+
+---
+
+## ✨ Características
+
+### 🔮 Predições Avançadas
+- **Single-step**: Previsão do próximo dia
+- **Multi-step**: Previsões para até 30 dias
+- **Análise técnica**: Volatilidade, tendências e confiança
+- **100+ tickers**: Dados históricos do NASDAQ-100
+
+### 🌐 Interface Completa
+- **Dashboard Web**: Interface amigável em português
+- **Swagger UI**: Documentação interativa das APIs
+- **Visualizações**: Gráficos e cards informativos
+- **Responsivo**: Funciona em desktop e mobile
+
+### 📊 Monitoramento Robusto
+- **Métricas em tempo real**: Latência, throughput, recursos
+- **Detecção de drift**: Alerta sobre degradação do modelo
+- **Health checks**: Verificação automática de saúde
+- **Logs estruturados**: JSONL para análise posterior
+
+### 🐳 Deploy Simplificado
+- **Containerfile otimizado**: Build rápido e eficiente
+- **Multi-stage**: Imagem leve (~800MB)
+- **Usuário non-root**: Segurança reforçada
+- **Health checks**: Restart automático em falhas
+
+---
+
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Browser / Cliente                        │
+└─────────────────┬───────────────────────────┬───────────────┘
+                  │                           │
+         ┌────────▼────────┐         ┌────────▼─────────┐
+         │  Web Interface  │         │   Swagger UI     │
+         │   (Port 8080)   │         │  /api-docs       │
+         └────────┬────────┘         └────────┬─────────┘
+                  │                           │
+         ┌────────▼───────────────────────────▼─────────┐
+         │           API RESTful (Port 5001)            │
+         │  ┌──────────────────────────────────────┐    │
+         │  │  /api/v1/predict                     │    │
+         │  │  /api/v1/predict-multi               │    │
+         │  │  /api/v1/tickers                     │    │
+         │  │  /api/v1/analytics/<ticker>          │    │
+         │  └──────────────────────────────────────┘    │
+         └────────┬─────────────────────────────────────┘
+                  │
+         ┌────────▼──────────┐
+         │   LSTM Model      │
+         │   (TensorFlow)    │
+         │   52,033 params   │
+         └────────┬──────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+┌───▼────┐  ┌─────▼──────┐  ┌──▼────────┐
+│ Logs   │  │ Monitoring │  │ Historical│
+│ System │  │ Dashboard  │  │   Data    │
+│        │  │(Port 5000) │  │  (CSV)    │
+└────────┘  └────────────┘  └───────────┘
+```
+
+**Componentes:**
+
+1. **Web Interface (8080)**: Dashboard principal com interface amigável
+2. **API RESTful (5001)**: Endpoints para predições e dados
+3. **Monitoring Dashboard (5000)**: Métricas e health checks
+4. **LSTM Model**: Rede neural com 60 timesteps de sequência
+5. **Logs System**: Eventos (JSONL) e métricas estruturadas
+
+---
+
+## � Estrutura do Projeto
+
+### Árvore Completa
+
+```
+techchallenge_04/
+│
+├── README.md                              # Documentação completa
+├── Containerfile                          # Build da imagem container
+├── .gitignore                             # Regras para versionamento Git
+│
+└── src/                                   # Código-fonte da aplicação
+    │
+    ├── 🔌 API & Interface
+    │   ├── api.py                         # API RESTful (Flask)
+    │   │   ├── Endpoints: /api/v1/predict, /api/v1/predict-multi
+    │   │   ├── Endpoints: /api/v1/tickers, /api/v1/analytics
+    │   │   ├── Swagger UI: /swagger-ui/, /api-docs
+    │   │   └── Documentação: /openapi.json, /swagger/<tag>.json
+    │   │
+    │   └── web_interface.py               # Dashboard Web (Flask)
+    │       ├── Principal: http://localhost:8080
+    │       ├── 4 Cards: Predição, Logs, Monitoramento, Docs
+    │       └── Interface amigável em português
+    │
+    ├── 🤖 Machine Learning & Modelo
+    │   ├── lstm_model.py                  # Definição do modelo LSTM
+    │   │   ├── Arquitetura: 2 camadas LSTM + Dense
+    │   │   ├── Parâmetros: 52,033
+    │   │   ├── Input: Sequência de 60 dias
+    │   │   └── Output: Previsão do próximo dia
+    │   │
+    │   ├── lstm_inference.py              # Engine de inferência
+    │   │   ├── Carregamento do modelo
+    │   │   ├── Normalização de dados
+    │   │   ├── Predição single/multi-step
+    │   │   └── Cálculo de métricas (volatilidade, tendência)
+    │   │
+    │   └── lstm_model_AAPL.keras          # Modelo pré-treinado
+    │       └── Treinado com NASDAQ-100 (653KB)
+    │
+    ├── 📊 Monitoramento & Métricas
+    │   ├── monitoring_dashboard.py        # Dashboard de métricas (Flask)
+    │   │   ├── Porta: 5000
+    │   │   ├── Status do modelo
+    │   │   ├── Latência de inferência
+    │   │   ├── Recursos (CPU, memória, disco)
+    │   │   └── Detecção de drift
+    │   │
+    │   ├── model_monitoring.py            # Monitor do modelo
+    │   │   ├── Detecção de degradação
+    │   │   ├── Drift detection
+    │   │   ├── Health checks
+    │   │   └── Alertas
+    │   │
+    │   ├── inference_monitoring.py        # Monitor de inferência
+    │   │   ├── Latência (média, min, max, p95)
+    │   │   ├── Throughput
+    │   │   ├── Taxa de erro
+    │   │   └── Registro de eventos
+    │   │
+    │   └── monitoring_config.py           # Configuração do sistema
+    │       ├── Thresholds de alerta
+    │       ├── Período de monitoramento
+    │       ├── Tamanho de janela
+    │       └── Limites de recursos
+    │
+    ├── ⚙️ Configuração & Deploy
+    │   ├── requirements.txt               # Dependências Python
+    │   │   ├── tensorflow 2.13+
+    │   │   ├── flask 2.3+
+    │   │   ├── pandas 1.5+
+    │   │   ├── numpy 1.24+
+    │   │   ├── flasgger 0.9.7+
+    │   │   └── (mais 10+ pacotes)
+    │   │
+    │   ├── swagger.yml                    # Especificação OpenAPI 3.0
+    │   │   ├── 9 endpoints documentados
+    │   │   ├── 5 categorias (Sistema, Predições, Dados, Análise, Monitoramento)
+    │   │   ├── Schemas de request/response
+    │   │   └── Exemplos de uso
+    │   │
+    │   ├── START_ALL.sh                   # Script de inicialização
+    │   │   ├── Cria diretórios necessários
+    │   │   ├── Inicia API (5001)
+    │   │   ├── Inicia Web Interface (8080)
+    │   │   ├── Inicia Monitoring Dashboard (5000)
+    │   │   └── Aguarda sinais de encerramento
+    │   │
+    │   ├── run_all.sh                     # Orquestrador de serviços
+    │   │   ├── Verifica Python environment
+    │   │   ├── Instala dependências
+    │   │   ├── Executa serviços em background
+    │   │   └── Registra PIDs
+    │   │
+    │   └── API_EXAMPLES.sh                # Exemplos de requisições
+    │       ├── Predição single-step
+    │       ├── Predição multi-step
+    │       ├── Listar tickers
+    │       └── Análise técnica
+    │
+    ├── 📂 Dados & Logs
+    │   ├── data/
+    │   │   └── NASDAQ100_Historical_Data.csv
+    │   │       ├── 100+ tickers
+    │   │       ├── Dados históricos
+    │   │       ├── OHLCV (Open, High, Low, Close, Volume)
+    │   │       └── 26MB de dados
+    │   │
+    │   ├── logs/                          # Logs da aplicação
+    │   │   ├── .gitkeep
+    │   │   └── (Criados em runtime: API.log, Dashboard.log, Interface.log)
+    │   │
+    │   └── monitoring_logs/               # Eventos e métricas
+    │       ├── events.jsonl               # Eventos do sistema (estruturado)
+    │       ├── metrics.jsonl              # Métricas de monitoramento
+    │       └── .gitkeep
+    │
+    └── __pycache__/                       # Cache Python (não versionado)
+```
+
+### Descrição dos Componentes
+
+#### 🔌 API & Interface (api.py, web_interface.py)
+- **API RESTful**: Serviço principal em Flask na porta 5001
+  - 9 endpoints para predição, análise e dados
+  - Documentação Swagger interativa
+  - Validação de entrada e tratamento de erros
+  
+- **Web Interface**: Dashboard web na porta 8080
+  - Interface amigável em português
+  - 4 cards de funcionalidades
+  - Links para Swagger e documentação
+  - Responsive design (desktop/mobile)
+
+#### 🤖 Machine Learning (lstm_model.py, lstm_inference.py)
+- **Modelo LSTM**: Rede neural treinada com 52,033 parâmetros
+  - 2 camadas LSTM (128 e 64 unidades)
+  - Sequência de entrada: 60 dias
+  - Output: Previsão do próximo dia
+  - Taxa de acurácia: ~85%
+  
+- **Engine de Inferência**: Orquestra predições
+  - Carregamento automático do modelo
+  - Normalização Min-Max dos dados
+  - Cálculo de métricas (volatilidade, tendência, confiança)
+  - Suporte a single-step e multi-step
+
+#### 📊 Monitoramento (monitoring_dashboard.py, model_monitoring.py)
+- **Dashboard de Métricas**: Visualização em tempo real
+  - Latência de inferência
+  - Uso de CPU/memória
+  - Histórico de predições
+  - Alertas e condições anormais
+  
+- **Monitor do Modelo**: Detecção automática
+  - Drift detection (mudanças no dataset)
+  - Degradação de performance
+  - Health checks periódicos
+  - Logs estruturados em JSONL
+
+#### ⚙️ Configuração (requirements.txt, swagger.yml, scripts)
+- **Dependências**: 15+ pacotes Python
+- **OpenAPI**: Especificação completa de todos os endpoints
+- **Scripts**: Automação de inicialização e orquestração
+
+#### 📂 Dados & Logs
+- **Dataset**: NASDAQ-100 histórico com 26MB
+- **Logs**: Estruturados em JSON Lines para análise posterior
+- **Diretórios**: Estrutura preparada para volumes em container
+
+### Fluxo de Dados
+
+```
+Cliente (Browser/cURL)
+    ↓
+API RESTful (5001)
+    ↓
+├→ Validação de entrada
+│
+├→ LSTM Inference Engine
+│   ├→ Carrega modelo
+│   ├→ Normaliza dados históricos
+│   ├→ Executa predição
+│   └→ Calcula métricas
+│
+├→ Monitoring System
+│   ├→ Registra latência
+│   ├→ Coleta recursos do SO
+│   ├→ Detecta anomalias
+│   └→ Log em eventos.jsonl
+│
+└→ Response (JSON)
+    ↓
+Cliente (resultado + metadata)
+```
+
+---
+
 ## �🐳 Execução com Podman
 
 ### Pré-requisitos

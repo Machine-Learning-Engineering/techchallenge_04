@@ -394,7 +394,7 @@ HTML_TEMPLATE = """
                 <h2><span>📊</span> Monitoramento</h2>
                 <p>Acesse o dashboard de monitoramento em tempo real do sistema.</p>
                 <div class="card-links">
-                    <a href="http://localhost:5000" target="_blank" class="btn btn-secondary btn-small">
+                    <a href="#" onclick="window.open(DASHBOARD_URL, '_blank'); return false;" class="btn btn-secondary btn-small">
                         Ir para Monitoramento
                     </a>
                 </div>
@@ -404,10 +404,10 @@ HTML_TEMPLATE = """
                 <h2><span>📚</span> Documentação API</h2>
                 <p>Explore a documentação interativa e testes dos endpoints da API.</p>
                 <div class="card-links">
-                    <a href="http://localhost:5001/api-docs" target="_blank" class="btn btn-secondary btn-small">
+                    <a href="#" onclick="window.open(API_URL + '/api-docs', '_blank'); return false;" class="btn btn-secondary btn-small">
                         Swagger UI
                     </a>
-                    <a href="http://localhost:5001/api-docs" target="_blank" class="btn btn-secondary btn-small">
+                    <a href="#" onclick="window.open(API_URL + '/api-docs', '_blank'); return false;" class="btn btn-secondary btn-small">
                         API Info
                     </a>
                 </div>
@@ -481,6 +481,14 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        // Detectar dinamicamente as URLs dos serviços baseado no hostname do navegador
+        const API_HOST = window.location.hostname;
+        const API_URL = `http://${API_HOST}:5001`;
+        const DASHBOARD_URL = `http://${API_HOST}:5000`;
+        
+        console.log('Detectado API_URL:', API_URL);
+        console.log('Detectado DASHBOARD_URL:', DASHBOARD_URL);
+        
         // Funções globais para o window
         window.showPredictionModal = function() {
             console.log('showPredictionModal chamado');
@@ -511,7 +519,7 @@ HTML_TEMPLATE = """
             loading.style.display = 'block';
             result.style.display = 'none';
             
-            fetch('http://localhost:5001/api/v1/predict', {
+            fetch(`${API_URL}/api/v1/predict`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ticker: ticker, days: parseInt(days)})
@@ -538,7 +546,7 @@ HTML_TEMPLATE = """
         
         function loadTickers() {
             console.log('loadTickers chamado');
-            fetch('http://localhost:5001/api/v1/tickers')
+            fetch(`${API_URL}/api/v1/tickers`)
                 .then(r => r.json())
                 .then(data => {
                     const select = document.getElementById('tickerSelect');
@@ -648,7 +656,7 @@ HTML_TEMPLATE = """
             loading.style.display = 'block';
             content.style.display = 'none';
             
-            fetch('http://localhost:5001/api/v1/logs?limit=50')
+            fetch(`${API_URL}/api/v1/logs?limit=50`)
                 .then(response => response.json())
                 .then(data => {
                     loading.style.display = 'none';
