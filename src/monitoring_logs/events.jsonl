@@ -147,3 +147,5 @@
 {"timestamp": "2026-02-26T19:45:48.120159", "event_type": "model_loaded", "model_path": "lstm_model_AAPL.keras", "sequence_length": 60, "parameters": 52033}
 {"timestamp": "2026-02-26T19:46:53.269078", "event_type": "model_loaded", "model_path": "lstm_model_AAPL.keras", "sequence_length": 60, "parameters": 52033}
 {"timestamp": "2026-02-26T19:47:53.908680", "event_type": "inference", "inference_count": 1, "latency_ms": 172.35875129699707, "cpu_percent": 0.0, "memory_mb": 714.3828125}
+{"timestamp": "2026-03-03T18:36:54.941877", "event_type": "model_loaded", "model_path": "lstm_model_AAPL.keras", "sequence_length": 60, "parameters": 52033}
+{"timestamp": "2026-03-03T18:37:45.193051", "event_type": "model_loaded", "model_path": "lstm_model_AAPL.keras", "sequence_length": 60, "parameters": 52033}

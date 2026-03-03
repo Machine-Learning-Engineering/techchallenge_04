@@ -5,7 +5,6 @@ Demonstra como usar o modelo salvo para prever preços de ações
 """
 
 import sys
-import logging
 import warnings
 from pathlib import Path
 import numpy as np
@@ -14,13 +13,14 @@ import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from datetime import datetime
 
+# Logging centralizado
+from logging_config import get_logger, init_logging
+
 warnings.filterwarnings('ignore')
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Inicializar logging
+init_logging()
+logger = get_logger(__name__)
 
 
 class LSTMInferenceEngine:
@@ -51,12 +51,17 @@ class LSTMInferenceEngine:
             bool: True se carregado com sucesso
         """
         try:
+            logger.debug(f"Verificando existência do modelo: {Path(self.model_path).absolute()}")
+            
             if not Path(self.model_path).exists():
                 logger.error(f"❌ Modelo não encontrado: {self.model_path}")
                 return False
             
+            logger.debug(f"Tamanho do arquivo do modelo: {Path(self.model_path).stat().st_size / 1024 / 1024:.2f} MB")
+            
             logger.info(f"📂 Carregando modelo de {self.model_path}...")
             self.model = tf.keras.models.load_model(self.model_path)
+            logger.debug(f"Modelo carregado na memória com sucesso")
             
             # Inferir sequence_length desta primeira camada
             input_shape = self.model.input_shape
@@ -66,11 +71,14 @@ class LSTMInferenceEngine:
             logger.info(f"   Input Shape: {self.model.input_shape}")
             logger.info(f"   Sequence Length: {self.sequence_length}")
             logger.info(f"   Total Parameters: {self.model.count_params():,}")
+            logger.debug(f"   Camadas do modelo: {len(self.model.layers)}")
+            for i, layer in enumerate(self.model.layers):
+                logger.debug(f"     Layer {i}: {layer.__class__.__name__} - {layer.output_shape}")
             
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erro ao carregar modelo: {str(e)}")
+            logger.error(f"❌ Erro ao carregar modelo: {str(e)}", exc_info=True)
             return False
     
     def load_scaler_from_data(self, csv_path: str, ticker: str = 'AAPL'):
@@ -83,8 +91,21 @@ class LSTMInferenceEngine:
         """
         try:
             logger.info(f"📂 Carregando dados para calibrar normalização...")
+            logger.debug(f"Arquivo CSV: {Path(csv_path).absolute()}")
+            logger.debug(f"Ticker alvo: {ticker}")
+            
+            if not Path(csv_path).exists():
+                logger.error(f"❌ Arquivo CSV não encontrado: {csv_path}")
+                return False
+            
+            logger.debug(f"Tamanho do arquivo CSV: {Path(csv_path).stat().st_size / 1024 / 1024:.2f} MB")
+            
             df = pd.read_csv(csv_path)
+            logger.debug(f"DataFrame carregado: {len(df)} linhas, {len(df.columns)} colunas")
+            logger.debug(f"Colunas: {list(df.columns)}")
+            
             df_ticker = df[df['Ticker'] == ticker].copy()
+            logger.debug(f"Registros para ticker '{ticker}': {len(df_ticker)}")
             
             if len(df_ticker) == 0:
                 logger.error(f"❌ Nenhum dado encontrado para {ticker}")
@@ -92,9 +113,14 @@ class LSTMInferenceEngine:
             
             df_ticker['Date'] = pd.to_datetime(df_ticker['Date'])
             df_ticker = df_ticker.sort_values('Date')
+            logger.debug(f"Período de dados: {df_ticker['Date'].min()} a {df_ticker['Date'].max()}")
             
             prices = df_ticker['Adj Close'].values.reshape(-1, 1)
+            logger.debug(f"Array de preços (Adj Close): {len(prices)} valores")
+            logger.debug(f"Range de preços: ${prices.min():.2f} - ${prices.max():.2f}")
+            
             self.scaler.fit(prices)
+            logger.debug(f"MinMaxScaler calibrado: data_min={self.scaler.data_min_}, data_max={self.scaler.data_max_}")
             
             logger.info(f"✅ Normalização calibrada!")
             logger.info(f"   Min: ${prices.min():.2f}")
@@ -104,7 +130,7 @@ class LSTMInferenceEngine:
             return True
             
         except Exception as e:
-            logger.error(f"❌ Erro ao calibrar normalização: {str(e)}")
+            logger.error(f"❌ Erro ao calibrar normalização: {str(e)}", exc_info=True)
             return False
     
     def predict_single(self, recent_prices: np.ndarray) -> dict:

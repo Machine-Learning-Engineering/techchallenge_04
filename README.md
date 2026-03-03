@@ -781,21 +781,25 @@ podman build -t lstm-prediction:latest -f Containerfile .
 
 **Tempo estimado:** 5-10 minutos (primeira vez)
 
-### 2. Executar Container
+### 2. Executar Container 
+
+#### ✨ Forma Simples (Recomendado)
 
 ```bash
-# Executar em modo daemon
-podman run \
-  --replace \
+# Sem nenhum volume - tudo automaticamente efêmero
+podman run -d \
   --name lstm-prediction \
   -p 8080:8080 \
   -p 5001:5001 \
   -p 5000:5000 \
-  -v $(pwd)/src/logs:/app/src/logs:z \
-  -v $(pwd)/src/monitoring_logs:/app/src/monitoring_logs:z \
-  --restart unless-stopped \
   lstm-prediction:latest
 ```
+
+**Nota sobre Permissões**: 
+- A aplicação roda com usuário `appuser` (UID 1000) por segurança
+- Diretórios de log são criados automaticamente em `/tmp` (tempfs)
+- Se receber erro "Permission denied", o entrypoint.sh resolve automaticamente
+- Não é necessário usar flags de usuário (-u) ou volumes especiais
 
 **Parâmetros Explicados:**
 
@@ -1268,6 +1272,32 @@ lsof -i :8080 && lsof -i :5001 && lsof -i :5000
 # Rebuild sem cache
 podman build --no-cache -t lstm-prediction:latest -f Containerfile .
 ```
+
+### Erro: "Permission denied: '/app/src/monitoring_logs/app.log'"
+
+**Causa**: Problemas de permissão ao escrever arquivos de log
+
+**Solução**: A aplicação resolve automaticamente!
+
+O sistema foi configurado para:
+- ✅ Rodar com usuário não-root por segurança (`appuser` UID 1000)
+- ✅ Criar diretórios de log em `/tmp` (tempfs) automaticamente
+- ✅ Fazer fallback para `/tmp` se houver erro de permissão
+- ✅ Usar console logging se arquivo não for possível
+
+**Se o erro persistir:**
+```bash
+# Verificar permissões
+podman exec lstm-prediction ls -la /app/src/
+
+# Verificar diretório de fallback
+podman exec lstm-prediction ls -la /tmp/lstm-logs/
+
+# Ver logs completos
+podman logs lstm-prediction 2>&1 | head -100
+```
+
+**Nota**: Não é necessário usar `-u root` ou montar volumes especiais. O container gerencia tudo automaticamente.
 
 ### Erro: "Model not loaded"
 

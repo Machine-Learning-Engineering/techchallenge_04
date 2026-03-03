@@ -5,7 +5,6 @@ Captura padrões temporais nos dados históricos de preços
 """
 
 import sys
-import logging
 import warnings
 from pathlib import Path
 import numpy as np
@@ -25,15 +24,15 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
+# Logging centralizado
+from logging_config import get_logger, init_logging
+
 # Suprimir warnings
 warnings.filterwarnings('ignore')
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Inicializar logging
+init_logging()
+logger = get_logger(__name__)
 
 
 class LSTMStockPricePredictor:
@@ -71,10 +70,25 @@ class LSTMStockPricePredictor:
             DataFrame filtrado para o ticker especificado
         """
         logger.info(f"📂 Carregando dados de {csv_path}")
+        logger.debug(f"Verificando se arquivo existe: {Path(csv_path).absolute()}")
+        
+        if not Path(csv_path).exists():
+            logger.error(f"❌ Arquivo não encontrado: {csv_path}")
+            raise FileNotFoundError(f"CSV não encontrado: {csv_path}")
+        
+        logger.debug(f"Tamanho do arquivo: {Path(csv_path).stat().st_size / 1024 / 1024:.2f} MB")
+        
         df = pd.read_csv(csv_path)
+        logger.debug(f"DataFrame inicial: {len(df)} linhas, {len(df.columns)} colunas")
+        logger.debug(f"Colunas: {list(df.columns)}")
         
         # Filtrar por ticker
         df_ticker = df[df['Ticker'] == self.ticker].copy()
+        logger.debug(f"Após filtro por ticker '{self.ticker}': {len(df_ticker)} linhas")
+        
+        if len(df_ticker) == 0:
+            logger.error(f"❌ Nenhum dado encontrado para ticker {self.ticker}")
+            raise ValueError(f"Ticker {self.ticker} não encontrado nos dados")
         
         logger.info(f"✅ Dados carregados: {len(df_ticker)} registros para {self.ticker}")
         
@@ -84,6 +98,7 @@ class LSTMStockPricePredictor:
         
         logger.info(f"   📅 Período: {df_ticker['Date'].min().date()} até {df_ticker['Date'].max().date()}")
         logger.info(f"   💰 Price Range: ${df_ticker['Close'].min():.2f} - ${df_ticker['Close'].max():.2f}")
+        logger.debug(f"   Colunas presentes: Close, Adj Close, Volume, etc")
         
         return df_ticker
     
@@ -97,9 +112,12 @@ class LSTMStockPricePredictor:
             val_size: Proporção de dados para validação (0.1 = 10%)
         """
         logger.info(f"\n📊 Preparando dados...")
+        logger.debug(f"Proporções: treino={train_size*100}%, validação={val_size*100}%, teste={(1-train_size-val_size)*100}%")
         
         # Usar a coluna de preço de fechamento ajustado
         data = df['Adj Close'].values.reshape(-1, 1)
+        logger.debug(f"Dados brutos (Adj Close): {len(data)} amostras")
+        logger.debug(f"Range: ${data.min():.2f} - ${data.max():.2f}")
         
         # Dividir em treino, validação e teste (split temporal)
         train_end = int(len(data) * train_size)
@@ -109,12 +127,23 @@ class LSTMStockPricePredictor:
         val_raw = data[train_end:val_end]
         test_raw = data[val_end:]
         
+        logger.debug(f"Divisão temporal realizada:")
+        logger.debug(f"  - Treino: índices 0-{train_end} ({len(train_raw)} amostras)")
+        logger.debug(f"  - Validação: índices {train_end}-{val_end} ({len(val_raw)} amostras)")
+        logger.debug(f"  - Teste: índices {val_end}-{len(data)} ({len(test_raw)} amostras)")
+        
         # Normalizar com base apenas no treino para evitar vazamento
         logger.info("   Normalizando dados com MinMaxScaler (fit no treino)...")
+        logger.debug(f"MinMaxScaler ajustando em dados de treino: min={train_raw.min()}, max={train_raw.max()}")
+        
         self.scaler.fit(train_raw)
         self.train_data = self.scaler.transform(train_raw)
         self.val_data = self.scaler.transform(val_raw)
         self.test_data = self.scaler.transform(test_raw)
+        
+        logger.debug(f"Normalização concluída")
+        logger.debug(f"  - Scaler data_min: {self.scaler.data_min_}")
+        logger.debug(f"  - Scaler data_max: {self.scaler.data_max_}")
         
         logger.info(f"   📈 Dados de treinamento: {len(self.train_data)} amostras")
         logger.info(f"   🧪 Dados de validação: {len(self.val_data)} amostras")

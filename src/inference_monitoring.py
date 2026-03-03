@@ -8,8 +8,13 @@ import numpy as np
 import tensorflow as tf
 from pathlib import Path
 from typing import Dict, Optional, List
-import logging
+
+# Logging centralizado
+from logging_config import get_logger, init_logging
 from model_monitoring import ProductionModelMonitor
+
+# Inicializar logging
+init_logging()
 
 
 class LSTMInferenceEngineWithMonitoring:
@@ -31,7 +36,7 @@ class LSTMInferenceEngineWithMonitoring:
         
         # Sistema de monitoramento
         self.monitor = ProductionModelMonitor(log_dir=monitoring_dir)
-        self.logger = logging.getLogger("InferenceWithMonitoring")
+        self.logger = get_logger("InferenceWithMonitoring")
         
         # Carrega modelo
         self._load_model()
@@ -43,7 +48,17 @@ class LSTMInferenceEngineWithMonitoring:
     def _load_model(self):
         """Carrega modelo treinado"""
         try:
+            self.logger.debug(f"Iniciando carregamento do modelo: {self.model_path}")
+            self.logger.debug(f"Caminho absoluto: {Path(self.model_path).absolute()}")
+            
+            if not Path(self.model_path).exists():
+                self.logger.error(f"❌ Arquivo do modelo não encontrado: {self.model_path}")
+                raise FileNotFoundError(f"Modelo não encontrado: {self.model_path}")
+            
+            self.logger.debug(f"Tamanho do arquivo: {Path(self.model_path).stat().st_size / 1024 / 1024:.2f} MB")
+            
             self.model = tf.keras.models.load_model(self.model_path)
+            self.logger.debug(f"Modelo carregado na memória")
             
             # Extrai sequence_length
             self.sequence_length = self.model.input_shape[1]
@@ -52,6 +67,14 @@ class LSTMInferenceEngineWithMonitoring:
             self.logger.info(f"   Input Shape: {self.model.input_shape}")
             self.logger.info(f"   Sequence Length: {self.sequence_length}")
             self.logger.info(f"   Total Parameters: {self.model.count_params():,}")
+            self.logger.debug(f"   Número de camadas: {len(self.model.layers)}")
+            for i, layer in enumerate(self.model.layers[:5]):  # Primeiras 5 camadas
+                try:
+                    # Tentar usar output.shape (TensorFlow 2.x)
+                    shape = layer.output.shape if hasattr(layer, 'output') else layer.get_config().get('units', '?')
+                    self.logger.debug(f"     Layer {i}: {layer.__class__.__name__} - {shape}")
+                except Exception as layer_err:
+                    self.logger.debug(f"     Layer {i}: {layer.__class__.__name__} - (shape indisponível: {type(layer_err).__name__})")
             
             self.monitor.logger.log_event("model_loaded", {
                 "model_path": self.model_path,
@@ -59,7 +82,7 @@ class LSTMInferenceEngineWithMonitoring:
                 "parameters": self.model.count_params()
             })
         except Exception as e:
-            self.logger.error(f"❌ Erro ao carregar modelo: {e}")
+            self.logger.error(f"❌ Erro ao carregar modelo: {e}", exc_info=True)
             raise
     
     def _load_scaler(self):
@@ -68,11 +91,24 @@ class LSTMInferenceEngineWithMonitoring:
         import pickle
         
         try:
+            self.logger.debug(f"Tentando carregar scaler de: {self.scaler_path}")
+            
+            if not Path(self.scaler_path).exists():
+                self.logger.warning(f"⚠️  Arquivo scaler não encontrado: {self.scaler_path}")
+                return
+            
+            self.logger.debug(f"Tamanho do arquivo scaler: {Path(self.scaler_path).stat().st_size} bytes")
+            
             with open(self.scaler_path, 'rb') as f:
                 self.scaler = pickle.load(f)
+            
             self.logger.info(f"✅ Scaler carregado: {self.scaler_path}")
+            self.logger.debug(f"   Scaler type: {type(self.scaler).__name__}")
+            if hasattr(self.scaler, 'data_min_'):
+                self.logger.debug(f"   Data min: {self.scaler.data_min_}")
+                self.logger.debug(f"   Data max: {self.scaler.data_max_}")
         except Exception as e:
-            self.logger.warning(f"⚠️  Scaler não disponível: {e}")
+            self.logger.warning(f"⚠️  Scaler não disponível: {e}", exc_info=True)
     
     def predict_single(self, recent_prices: np.ndarray) -> Dict:
         """

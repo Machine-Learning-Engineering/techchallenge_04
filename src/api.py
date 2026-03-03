@@ -16,8 +16,12 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 import json
 
+from logging_config import get_logger, init_logging
 from inference_monitoring import LSTMInferenceEngineWithMonitoring
 from monitoring_config import MonitoringPresets
+
+# Inicializa logging centralizado
+init_logging()
 
 
 # ============================================================================
@@ -27,27 +31,32 @@ from monitoring_config import MonitoringPresets
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# Logger para a API
+logger_main = get_logger("LSTMApi")
+
 # Inicializar Swagger/Flasgger
 try:
     swagger = Flasgger(app)
+    logger_main.debug("Flasgger inicializado com sucesso")
 except Exception as e:
-    logger_init = logging.getLogger("LSTMApi")
-    logger_init.warning(f"Erro ao inicializar Flasgger: {e}")
+    logger_main.warning(f"Erro ao inicializar Flasgger: {e}")
 
 # Carregar spec OpenAPI do arquivo YAML (para expor specs por API)
 OPENAPI_SPEC = None
 SPEC_FILE = Path(__file__).resolve().parent / "swagger.yml"
+logger_main.debug(f"Procurando arquivo swagger.yml em: {SPEC_FILE}")
 if SPEC_FILE.exists():
     try:
         import yaml
         with open(SPEC_FILE, 'r') as f:
             OPENAPI_SPEC = yaml.safe_load(f)
+        logger_main.debug(f"Arquivo swagger.yml carregado com sucesso")
     except ImportError:
-        logger_init = logging.getLogger("LSTMApi")
-        logger_init.warning("PyYAML nao instalado, swagger.yml sera ignorado")
+        logger_main.warning("PyYAML nao instalado, swagger.yml sera ignorado")
     except Exception as e:
-        logger_init = logging.getLogger("LSTMApi")
-        logger_init.warning(f"Erro ao carregar swagger.yml: {e}")
+        logger_main.warning(f"Erro ao carregar swagger.yml: {e}")
+else:
+    logger_main.debug(f"Arquivo swagger.yml não encontrado em {SPEC_FILE}")
 
 TAG_ALIASES = {
     "all": "all",
@@ -59,11 +68,7 @@ TAG_ALIASES = {
 }
 
 # Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("LSTMApi")
+logger = get_logger("LSTMApi")
 
 # Configuração global
 API_VERSION = "1.0.0"
@@ -92,33 +97,63 @@ def load_app_state():
     
     try:
         logger.info("🚀 Inicializando aplicação...")
+        logger.debug(f"Configuração: MODEL_PATH={MODEL_PATH}, DATA_PATH={DATA_PATH}")
         
         # Carrega modelo com monitoramento
         logger.info(f"📂 Carregando modelo: {MODEL_PATH}")
+        logger.debug(f"Tentando carregar modelo de: {Path(MODEL_PATH).absolute()}")
+        
+        if not Path(MODEL_PATH).exists():
+            logger.error(f"❌ Arquivo do modelo não encontrado: {MODEL_PATH}")
+            raise FileNotFoundError(f"Modelo não encontrado: {MODEL_PATH}")
+        
+        logger.debug(f"Arquivo do modelo encontrado, tamanho: {Path(MODEL_PATH).stat().st_size / 1024 / 1024:.2f} MB")
+        
         inference_engine = LSTMInferenceEngineWithMonitoring(
             model_path=MODEL_PATH,
             monitoring_dir=MONITORING_DIR
         )
+        logger.debug(f"Motor de inferência inicializado com sucesso")
         
         # Carrega dados históricos
         logger.info(f"📂 Carregando dados: {DATA_PATH}")
+        logger.debug(f"Tentando carregar dados de: {Path(DATA_PATH).absolute()}")
+        
+        if not Path(DATA_PATH).exists():
+            logger.error(f"❌ Arquivo de dados não encontrado: {DATA_PATH}")
+            raise FileNotFoundError(f"Dados não encontrados: {DATA_PATH}")
+        
+        logger.debug(f"Arquivo de dados encontrado, tamanho: {Path(DATA_PATH).stat().st_size / 1024 / 1024:.2f} MB")
+        
         df_historical = pd.read_csv(DATA_PATH)
+        logger.debug(f"CSV carregado com {len(df_historical)} linhas e {len(df_historical.columns)} colunas")
+        logger.debug(f"Colunas: {list(df_historical.columns)}")
+        
         df_historical['Date'] = pd.to_datetime(df_historical['Date'])
+        logger.debug(f"Convertido coluna 'Date' para datetime")
+        logger.debug(f"Tickers únicos: {df_historical['Ticker'].nunique()}")
+        logger.debug(f"Período de dados: {df_historical['Date'].min()} a {df_historical['Date'].max()}")
         
         app_state["model_loaded"] = True
         logger.info("✅ Aplicação inicializada com sucesso")
         
     except Exception as e:
-        logger.error(f"❌ Erro ao inicializar: {e}")
+        logger.error(f"❌ Erro ao inicializar: {e}", exc_info=True)
         app_state["model_loaded"] = False
         raise
+    finally:
+        logger.debug(f"Estado da aplicação: model_loaded={app_state['model_loaded']}")
 
 
 def validate_ticker(ticker: str) -> bool:
     """Valida se ticker existe nos dados"""
     if df_historical is None:
+        logger.debug(f"Validação de ticker '{ticker}' falhou: df_historical é None")
         return False
-    return ticker in df_historical['Ticker'].unique()
+    
+    exists = ticker in df_historical['Ticker'].unique()
+    logger.debug(f"Ticker '{ticker}' {'encontrado' if exists else 'não encontrado'} nos dados")
+    return exists
 
 
 def get_ticker_data(ticker: str, days: int = 365) -> Tuple[np.ndarray, bool]:
@@ -132,16 +167,24 @@ def get_ticker_data(ticker: str, days: int = 365) -> Tuple[np.ndarray, bool]:
     Returns:
         (prices_array, success)
     """
+    logger.debug(f"Buscando dados históricos para ticker '{ticker}' ({days} dias)")
+    
     if df_historical is None:
+        logger.debug("df_historical é None, não há dados disponíveis")
         return None, False
     
     df_ticker = df_historical[df_historical['Ticker'] == ticker].copy()
+    logger.debug(f"Encontrados {len(df_ticker)} registros totais para {ticker}")
+    
     df_ticker = df_ticker.sort_values('Date').tail(days)
+    logger.debug(f"Após filtro de {days} dias: {len(df_ticker)} registros")
     
     if len(df_ticker) == 0:
+        logger.warning(f"Nenhum dado encontrado para ticker '{ticker}'")
         return None, False
     
     prices = df_ticker['Close'].values
+    logger.debug(f"Array de preços extraído: {len(prices)} valores, min=${prices.min():.2f}, max=${prices.max():.2f}, média=${prices.mean():.2f}")
     return prices, True
 
 
@@ -155,29 +198,41 @@ def extract_prices_from_request(data: Dict) -> Tuple[np.ndarray, bool]:
     Returns:
         (prices_array, success)
     """
+    logger.debug(f"Extraindo preços da requisição. Chaves presentes: {list(data.keys())}")
+    
     # Opção 1: Preços fornecidos diretamente
     if 'prices' in data:
+        logger.debug("Preços fornecidos diretamente na requisição")
         try:
             prices = np.array(data['prices'], dtype=float)
+            logger.debug(f"Array de {len(prices)} preços extraído com sucesso")
+            
             if len(prices) < 10:
+                logger.warning(f"Número de preços insuficiente: {len(prices)} (mínimo: 10)")
                 return None, False
+            
             return prices, True
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Erro ao converter preços para float: {e}")
             return None, False
     
     # Opção 2: Ticker + dias
     if 'ticker' in data and 'days' in data:
         ticker = data['ticker'].upper()
         days = int(data['days'])
+        logger.debug(f"Usando ticker '{ticker}' com {days} dias")
         
         if not validate_ticker(ticker):
+            logger.warning(f"Ticker '{ticker}' não validou")
             return None, False
         
         if days < 10 or days > 1000:
+            logger.warning(f"Número de dias inválido: {days} (permitido: 10-1000)")
             return None, False
         
         return get_ticker_data(ticker, days)
     
+    logger.warning("Nenhuma opção válida de preços ou ticker+dias foi encontrada")
     return None, False
 
 

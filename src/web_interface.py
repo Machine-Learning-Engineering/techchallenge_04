@@ -9,6 +9,13 @@ from flask_cors import CORS
 import json
 from datetime import datetime
 
+# Logging centralizado
+from logging_config import get_logger, init_logging
+
+# Inicializar logging
+init_logging()
+logger = get_logger(__name__)
+
 app = Flask(__name__)
 CORS(app)
 
