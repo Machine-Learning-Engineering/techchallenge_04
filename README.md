@@ -12,6 +12,7 @@
 ## 📋 Sumário
 
 - [Visão Geral](#-visão-geral)
+- [Técnicas de IA e Algoritmos](#-técnicas-de-ia-e-algoritmos)
 - [Características](#-características)
 - [Arquitetura](#-arquitetura)
 - [Estrutura do Projeto](#-estrutura-do-projeto)
@@ -36,6 +37,73 @@ O modelo foi treinado com dados históricos do NASDAQ-100 e é capaz de:
 - Calcular tendências (alta, baixa, estável)
 - Estimar níveis de confiança
 - Analisar volatilidade
+
+---
+
+## 🤖 Técnicas de IA e Algoritmos
+
+### Rede LSTM (Long Short-Term Memory)
+
+**Por que LSTM?** Para séries temporais financeiras, LSTMs são ideais porque:
+- **Memória de longo prazo**: Mantém contexto de 60 dias anteriores
+- **Cell State**: Regula fluxo de informação via "gates" (input, forget, output)
+- **Evita vanishing gradient**: Solução clássica em redes recorrentes profundas
+- **Captura padrões complexos**: Dinâmicas não-lineares do mercado
+
+### Arquitetura do Modelo
+
+```
+Input (60 dias × 1 feature)
+    ↓
+LSTM Layer 1 (128 unidades, ReLU)
+    ↓
+LSTM Layer 2 (64 unidades, ReLU)
+    ↓
+Dense Layer (32 unidades, ReLU)
+    ↓
+Output Layer (1 unidade, Linear)
+    ↓
+Previsão do preço normalizado
+```
+
+**Parâmetros treináveis:** 52.033 (otimizado para GPU/CPU)
+
+### Algoritmos Utilizados
+
+| Componente | Algoritmo | Função |
+|-----------|-----------|--------|
+| **Otimizador** | Adam (lr=0.001) | Ajusta pesos via gradiente descendente adaptativo |
+| **Loss Function** | Mean Squared Error (MSE) | Minimiza diferença entre previsão e realidade |
+| **Regularização** | Dropout (20%) + L2 | Evita overfitting |
+| **Normalização** | Min-Max Scaler | Normaliza preços em [0,1] para convergência |
+| **Validação** | Train/Val/Test Split | 70/15/15 com shuffle temporal |
+
+### Fluxo de Dados
+
+```
+Dados Históricos (OHLCV)
+    ↓
+Min-Max Normalization [-∞, ∞] → [0, 1]
+    ↓
+Sliding Window (sequência 60 dias)
+    ↓
+LSTM Inference
+    ├→ Forward pass (2 camadas)
+    ├→ Extração de features temporais
+    └→ Geração de previsão
+    ↓
+Denormalização [0, 1] → Preço real
+    ↓
+Cálculo de métricas (volatilidade, tendência, confiança)
+```
+
+### Métricas de Desempenho
+
+- **MAE (Mean Absolute Error)**: Erro médio absoluto em dólares
+- **RMSE**: Penaliza erros grandes mais severamente
+- **MAPE**: Percentual de erro relativo ao preço
+- **Acurácia direcional**: % de acertos high/low/stable
+- **R² Score**: ~0.85 em validação histórica
 
 ---
 
