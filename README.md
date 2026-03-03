@@ -311,28 +311,3 @@ O sistema foi configurado para resolver automaticamente:
 
 ---
 
-## 📄 Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
----
-
-## 👥 Contribuidores
-
-- **Tech Challenge FIAP** - Desenvolvimento inicial
-
----
-
-## 📞 Suporte
-
-Para dúvidas ou problemas:
-
-1. Verifique a [documentação](#-sumário)
-2. Consulte o [Troubleshooting](#-troubleshooting)
-3. Veja a [estrutura do projeto](#-estrutura-do-projeto)
-
----
-
-**Versão**: 1.0.0  
-**Última atualização**: 26 de fevereiro de 2026  
-**Status**: ✅ Em produção
